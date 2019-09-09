@@ -19,7 +19,7 @@
     "group": { "default": "Other" },
     "title": { "default": "ListView" },
     "description": { "default": "ListView description" },
-    "officeFabricIconFontName": "Page",
+    "officeFabricIconFontName": "Table",
     "properties": {
       "description": "ListView"
     }

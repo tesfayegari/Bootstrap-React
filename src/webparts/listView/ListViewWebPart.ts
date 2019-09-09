@@ -23,7 +23,9 @@ export default class ListViewWebPart extends BaseClientSideWebPart<IListViewWebP
     const element: React.ReactElement<IListViewProps > = React.createElement(
       ListView,
       {
-        description: this.properties.description
+        spHttpClient: this.context.spHttpClient,
+        siteUrl: this.context.pageContext.web.absoluteUrl,
+        listName: 'PnpList'
       }
     );
 

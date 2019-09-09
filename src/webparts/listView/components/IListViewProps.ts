@@ -1,3 +1,7 @@
+import { SPHttpClient } from "@microsoft/sp-http";
+
 export interface IListViewProps {
-  description: string;
+  spHttpClient: SPHttpClient;
+  siteUrl: string;
+  listName: string;
 }
