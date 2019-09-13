@@ -3,7 +3,6 @@ import { IListViewProps } from "./IListViewProps";
 import { Table, Pagination } from "react-bootstrap";
 import { FaSearch, FaEye } from "react-icons/fa";
 import { CustomModal } from "./Modal";
-import { any } from "prop-types";
 import { SPHttpClient, SPHttpClientResponse } from "@microsoft/sp-http";
 require("./style.css");
 
@@ -16,6 +15,8 @@ interface ListViewState {
   items: any[];
   pageSize: number;
   nextLink: string;
+  prevLink: string[];
+  currentUrl: string;
 }
 
 export default class ListView extends React.Component<
@@ -31,7 +32,9 @@ export default class ListView extends React.Component<
       selectedItem: {},
       items: [],
       pageSize: 10,
-      nextLink: ""
+      nextLink: "",
+      prevLink: [`${this.props.siteUrl}/_api/web/lists/GetByTitle('${props.listName}')/items?$top=10`],
+      currentUrl: `${this.props.siteUrl}/_api/web/lists/GetByTitle('${props.listName}')/items?$top=10`
     };
     this.getListItemsCount(
       `${this.props.siteUrl}/_api/web/lists/GetByTitle('${props.listName}')/ItemCount`
@@ -50,25 +53,31 @@ export default class ListView extends React.Component<
     this.setState({ show: true, selectedItem: item });
   };
   private handleNext = () => {
-    this.setState({ pageNumber: this.state.pageNumber + 1 });
-    this._onPageUpdate(this.state.pageNumber + 1);
+    console.log('State At next', this.state);
+    var prev = this.state.prevLink;
+    prev.push(this.state.nextLink);
+    this.setState({ pageNumber: this.state.pageNumber + 1, prevLink: prev });
+    this._onPageUpdate(this.state.pageNumber + 1, true);
   };
   private handlePrev = () => {
+    var prev = this.state.prevLink;
+    if(this.state.currentUrl == this.state.prevLink[this.state.prevLink.length -1])prev.pop();
     this.setState({
-      pageNumber: this.state.pageNumber > 1 ? this.state.pageNumber - 1 : 1
+      pageNumber: this.state.pageNumber > 1 ? this.state.pageNumber - 1 : 1,
+      prevLink: prev
     });
     this.state.pageNumber > 1
-      ? this._onPageUpdate(this.state.pageNumber - 1)
+      ? this._onPageUpdate(this.state.pageNumber - 1, false)
       : "";
   };
 
-  private _onPageUpdate(pageNumber: number) {
+  private _onPageUpdate(pageNumber: number, isNext: boolean) {
     console.log("Current page", pageNumber);
-    const p_ID = (pageNumber - 1) * this.state.pageSize;
-    const queryParam = `%24skiptoken=Paged%3dTRUE%26p_ID=${p_ID}&$top=${this.state.pageSize}`;
-    var url =
-      `${this.props.siteUrl}/_api/web/lists/GetByTitle('${this.props.listName}')/items?` +
-      queryParam;
+    var prev = this.state.prevLink;
+
+    console.log('State on page update: ', this.state)
+    var url = isNext ? this.state.nextLink : prev.pop();
+    if(!isNext) this.setState({prevLink: prev});
     this.readItems(url);
   }
 
@@ -76,18 +85,26 @@ export default class ListView extends React.Component<
     e.preventDefault();
     this.setState({ [e.target.name]: e.target.value } as ListViewState);
   }
-  private handleSubmit(event) {
-    console.log("A Search was submitted: " + this.state.searchQuery);
-    event.preventDefault();
+  private buildFilter(){
     const filter = this.state.searchQuery
-      ? `&$filter=substringof('${this.state.searchQuery}',Title) or substringof('${this.state.searchQuery}',first_name)`
+      ? `&$filter=substringof('${this.state.searchQuery}',Title) or substringof('${this.state.searchQuery}',first_name) or substringof('${this.state.searchQuery}',department)`
       : "";
+      return filter;
+  }
+  private handleSubmit(event) {
+    event.preventDefault();
+    const filter = this.buildFilter();
+    var prev = [`${this.props.siteUrl}/_api/web/lists/GetByTitle('${this.props.listName}')/items?$top=${this.state.pageSize}${filter}`];
+
+    this.setState({nextLink: '', prevLink: prev, pageNumber: 1});
+
     this.readItems(
       `${this.props.siteUrl}/_api/web/lists/GetByTitle('${this.props.listName}')/items?$top=${this.state.pageSize}${filter}`
     );
   }
 
   private getListItemsCount(url: string) {
+
     this.props.spHttpClient
       .get(url, SPHttpClient.configurations.v1, {
         headers: {
@@ -110,7 +127,8 @@ export default class ListView extends React.Component<
 
   private readItems(url: string) {
     this.setState({
-      items: []
+      items: [],
+      currentUrl: url
     });
     this.props.spHttpClient
       .get(url, SPHttpClient.configurations.v1, {
@@ -132,6 +150,7 @@ export default class ListView extends React.Component<
             items: response.value,
             nextLink: response["odata.nextLink"]
           });
+          console.log('State ', this.state);
         },
         (error: any): void => {
           console.error("Error happened: ", error);
